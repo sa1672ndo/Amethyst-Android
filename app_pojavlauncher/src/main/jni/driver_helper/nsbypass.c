@@ -95,7 +95,7 @@ bool linker_ns_load(const char* lib_search_path) {
                                                       full_path,
                                                       full_path,
                                                       3 /* TYPE_SHAFED | TYPE_ISOLATED */,
-                                                      "/system/:/data/:/vendor/:/apex/", NULL);
+                                                      "/system/:/data/:/vendor/:/apex/:/system_ext/", NULL);
     // THIS IS VERY IMPORTANT and how I trolled FoldCraft:
     // You need to link the new driver_namespace with NULL and and add ld-android.so
     // in the link list, to pass through the driver_namespace correctly.
