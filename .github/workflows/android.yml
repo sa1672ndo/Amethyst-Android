@@ -84,9 +84,9 @@ jobs:
       #    gradle :app_pojavlauncher:assembleRelease
       #    mv app_pojavlauncher/build/outputs/apk/release/app_pojavlauncher-release.apk out/app-release.apk
 
-      - name: Gen md5sums
-        run: |
-          md5sum out/app-release.apk > out/app-release.md5
+      #- name: Gen md5sums
+      #  run: |
+      #    md5sum out/app-release.apk > out/app-release.md5
 
       - name: Build Debug .apk
         run: |
