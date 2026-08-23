@@ -280,15 +280,30 @@ public final class Tools {
      * @return Whether or not the .jar is found
      */
     public static boolean hasMods(String... filenames) {
+        return !getMods(filenames).isEmpty();
+    }
+
+    /**
+     * Searches for mod in mods directory of current selected profile
+     * Not case-sensitive
+     * @param filenames Filename(s) of the .jar mod(s)
+     * @return The found mods
+     */
+    public static List<File> getMods(String... filenames) {
         File gameDir = getGameDir();
         File modsDir = new File(gameDir, "mods");
-        File[] modFiles = modsDir.listFiles(file -> file.isFile() && file.getName().endsWith(".jar"));
-        if (modFiles == null) return false;
+        File[] modFiles = modsDir.listFiles(file -> file.isFile() && file.getName().toLowerCase().endsWith(".jar"));
+        if (modFiles == null) return new ArrayList<>();
+        List<File> foundModFiles = new ArrayList<>();
         for (File file : modFiles) {
             for (String filename : filenames)
-                if (file.getName().toLowerCase().contains(filename.toLowerCase())) return true;
+                if (file.getName().toLowerCase().contains(filename.toLowerCase()) &&
+                        file.getName().toLowerCase().endsWith(".jar")) {
+                    foundModFiles.add(file);
+                    break;
+                }
         }
-        return false;
+        return foundModFiles;
     }
 
     /**
@@ -901,8 +916,9 @@ public final class Tools {
 
         File[] lwjglModules = lwjgl3Folder.listFiles(pathname ->
                 pathname.getName().endsWith(".jar") &&
-            // Exclude our two special jars which goes first and last
+                // Exclude our three special jars which goes first, second and last
                 !pathname.getName().equals("lwjgl.jar") &&
+                !pathname.getName().equals("lwjgl-"+internalLwjglVersion+"-merged-modules.jar") &&
                 !pathname.getName().endsWith("lwjglx.jar"));
 
         if (lwjglModules != null) {
@@ -1919,7 +1935,7 @@ public final class Tools {
         return motionListener;
     }
 
-    static class SDL {
+    public static class SDL {
         /**
          * Initializes gamepad, joystick, and event subsystems.
          * This triggers {@link SDLControllerManager#pollInputDevices()} and subsequently disables
@@ -1927,4 +1943,6 @@ public final class Tools {
          */
         public static native void initializeControllerSubsystems();
     }
+    public static native String jObjectToString(Object object);
+    public static native long getJavaVMPointer();
 }
