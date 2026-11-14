@@ -101,7 +101,7 @@ android {
 
     defaultConfig {
         applicationId "org.angelauramc.amethyst"
-        minSdkVersion 21
+        minSdkVersion 26
         targetSdkVersion 34
         versionCode 10000000
         versionName getVersionName()
@@ -180,6 +180,8 @@ android {
     packagingOptions {
         jniLibs {
             useLegacyPackaging = true
+            // If you're debugging mesa libs, put them here, android will strip them
+            // and not properly link to source files, very smart android studio.
             keepDebugSymbols += ['**/libcutils.so']
             pickFirsts += ['**/libbytehook.so']
         }
@@ -249,5 +251,8 @@ dependencies {
 
     implementation "net.java.dev.jna:jna:5.14.0@aar"
 
+    implementation project(":androidnsbypass")
+
+    implementation project(':MobileGL')
 }
 apply from: rootProject.file('gradle/prefab_bypass.gradle')

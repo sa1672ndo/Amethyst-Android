@@ -7,6 +7,7 @@ import static net.kdt.pojavlaunch.Architecture.is64BitsDevice;
 import static net.kdt.pojavlaunch.Tools.LOCAL_RENDERER;
 import static net.kdt.pojavlaunch.Tools.NATIVE_LIB_DIR;
 import static net.kdt.pojavlaunch.Tools.currentDisplayMetrics;
+import static net.kdt.pojavlaunch.Tools.sAsmVersion;
 import static net.kdt.pojavlaunch.Tools.shareLog;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_DUMP_SHADERS;
 import static net.kdt.pojavlaunch.prefs.LauncherPreferences.PREF_VSYNC_IN_ZINK;
@@ -210,7 +211,6 @@ public class JREUtils {
         envMap.put("force_glsl_extensions_warn", "true");
         envMap.put("allow_higher_compat_version", "true");
         envMap.put("allow_glsl_extension_directive_midshader", "true");
-        envMap.put("MESA_LOADER_DRIVER_OVERRIDE", "zink");
         envMap.put("VTEST_SOCKET_NAME", new File(Tools.DIR_CACHE, ".virgl_test").getAbsolutePath());
 
         envMap.put("LD_LIBRARY_PATH", LD_LIBRARY_PATH);
@@ -227,6 +227,7 @@ public class JREUtils {
             }
             if(LOCAL_RENDERER.equals("opengles_mobileglues")){
                 envMap.put("MG_DIR_PATH", Tools.DIR_DATA + "/MobileGlues");
+                envMap.put("LIBGL_ES", "3");
                 envMap.put("POJAVEXEC_EGL","libmobileglues.so");
             }
             /*
@@ -254,7 +255,7 @@ public class JREUtils {
                 Tools.useSFPEW = false;
             }
             if (LOCAL_RENDERER.equals("opengles3_desktopgl_zink_kopper")){
-                envMap.put("POJAVEXEC_EGL","libEGL_mesa.so"); // Use Mesa EGL
+                envMap.put("POJAVEXEC_EGL", "libEGL_mesa.so"); // Use Mesa EGL
                 if (Tools.shouldUseUBWC()) envMap.put("FD_DEV_FEATURES", "enable_tp_ubwc_flag_hint=1"); // Turnip fix for OneUI rendering issues
             }
             if (LOCAL_RENDERER.toLowerCase().contains("zink")){
@@ -264,9 +265,22 @@ public class JREUtils {
                 // Don't use with Zink, it also does the same thing.
                 Tools.useSFPEW = false;
             }
-            if (Tools.useSFPEW) {
-                envMap.put("SFPEW_EGL", envMap.get("POJAVEXEC_EGL"));
+            if (LOCAL_RENDERER.equals("opengles_mobilegl_gles")){
+                envMap.put("MOBILEGL_BACKEND_TYPE", "DirectGLES");
+                if (Tools.useANGLE) {
+                    envMap.put("MOBILEGL_USE_ANGLE", "1");
+                }
             }
+            if (LOCAL_RENDERER.equals("opengles_mobilegl_vk")){
+                envMap.put("MOBILEGL_BACKEND_TYPE", "DirectVulkan");
+            }
+            if (LOCAL_RENDERER.startsWith("opengles_mobilegl_")){
+                envMap.put("POJAVEXEC_EGL","libMobileGL.so");
+                envMap.put("LIBGL_ES", "3");
+            }
+        }
+        if (Tools.useSFPEW) {
+            envMap.put("SFPEW_EGL", envMap.get("POJAVEXEC_EGL"));
         }
 
         if(LauncherPreferences.PREF_BIG_CORE_AFFINITY) envMap.put("POJAV_BIG_CORE_AFFINITY", "1");
@@ -385,8 +399,24 @@ public class JREUtils {
         // Some phones are not using the right number of cores, fix that
         userArgs.add("-XX:ActiveProcessorCount=" + java.lang.Runtime.getRuntime().availableProcessors());
         // Adds/changes methods for compatibility
+        // FIXME: May fail if not the first agent
         userArgs.add("-javaagent:"+new File(Tools.DIR_DATA,"MioLibPatcher/MioLibPatcher.jar").getAbsolutePath());
-        userArgs.add("-Dmiolibpatcher.alc10=true");
+        // Only needed for lwjglx
+        if (Tools.iLwjglVersion <= 299) userArgs.add("-Dmiolibpatcher.alc10=true");
+
+        if (Tools.sAsmVersion != null) {
+            // We override it with 5.0.4 and no forge version ever used 5.0.4, only 5.0.3
+            // This exists for AE1. If any other buggy mods come up, let's enable it for them too.
+            if (Integer.parseInt(Tools.sAsmVersion[0]) == 5 &&
+                    Integer.parseInt(Tools.sAsmVersion[1]) == 0 &&
+                    Integer.parseInt(Tools.sAsmVersion[2]) == 4) {
+                userArgs.add("-Dmiolibpatcher.asmBackport=true");
+            }
+        }
+
+        if(LauncherPreferences.PREF_ARC_CAPES) {
+            userArgs.add("-javaagent:"+new File(Tools.DIR_DATA,"arc_dns_injector/arc_dns_injector.jar").getAbsolutePath()+"=23.95.137.176");
+        }
 
         userArgs.addAll(JVMArgs);
         activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg,LauncherPreferences.PREF_RAM_ALLOCATION), Toast.LENGTH_SHORT).show());
@@ -450,9 +480,6 @@ public class JREUtils {
                 "-Dloader.disable_forked_guis=true",
                 "-Djdk.lang.Process.launchMechanism=FORK" // Default is POSIX_SPAWN which requires starting jspawnhelper, which doesn't work on Android
         ));
-        if(LauncherPreferences.PREF_ARC_CAPES) {
-            overridableArguments.add("-javaagent:"+new File(Tools.DIR_DATA,"arc_dns_injector/arc_dns_injector.jar").getAbsolutePath()+"=23.95.137.176");
-        }
         List<String> additionalArguments = new ArrayList<>();
         for(String arg : overridableArguments) {
             String strippedArg = arg.substring(0,arg.indexOf('='));
@@ -544,6 +571,8 @@ public class JREUtils {
                 renderLibrary = "libng_gl4es.so"; break;
             case "vulkan_zink": renderLibrary = "libOSMesa.so"; break;
             case "opengles_mobileglues": renderLibrary = "libmobileglues.so"; break;
+            case "opengles_mobilegl_vk":
+            case "opengles_mobilegl_gles": renderLibrary = "libMobileGL.so"; break;
             case "opengles3_desktopgl_zink_kopper": renderLibrary = "libglxshim.so"; break;
             case "opengles3_ltw" : renderLibrary = "libltw.so"; break;
             case "opengles_system_gles" : return null; // Literally nothing, this is for system GLES.
